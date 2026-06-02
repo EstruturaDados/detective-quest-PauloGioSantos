@@ -1,16 +1,17 @@
 /*
  * ============================================================
- *  Detective Quest — Nível Novato
- *  Mapa da Mansão com Árvore Binária
+ *  Detective Quest — Nível Aventureiro
+ *  Mapa da Mansão + Organização de Pistas com BST
  * ============================================================
  *  Autor  : Paulo Giovani dos Santos - Enigma Studios
- *  Versão : 1.0
+ *  Versão : 2.0  (estende o Nível Novato)
  *
- *  Descrição:
- *    Representa o mapa de uma mansão como uma árvore binária.
- *    Cada nó é uma sala (cômodo). O jogador explora a mansão
- *    escolhendo ir à esquerda (e) ou à direita (d) a partir
- *    do Hall de Entrada, até atingir um nó-folha.
+ *  Novidades em relação ao Nível Novato:
+ *    • Algumas salas possuem pistas associadas.
+ *    • Ao visitar uma sala com pista, ela é inserida numa
+ *      Árvore Binária de Busca (BST) de strings.
+ *    • Ao sair, o jogador pode listar todas as pistas
+ *      encontradas em ordem alfabética.
  * ============================================================
  */
 
@@ -19,76 +20,162 @@
 #include <string.h>
 
 /* ─── Constantes ─────────────────────────────────────────── */
-#define MAX_NOME 64
+#define MAX_NOME  64
+#define MAX_PISTA 128
 
-/* ─── Estrutura de dados ──────────────────────────────────── */
+/* ================================================================
+ *  MÓDULO 1 — Árvore Binária de Navegação (Mapa da Mansão)
+ * ================================================================ */
 
 /**
- * Sala — nó da árvore binária.
+ * Sala — nó da árvore binária do mapa.
  *
- * @campo nome      Nome descritivo do cômodo.
- * @campo esquerda  Ponteiro para o cômodo à esquerda.
- * @campo direita   Ponteiro para o cômodo à direita.
+ * @campo nome      Nome do cômodo.
+ * @campo pista     Pista encontrada na sala (vazio = sem pista).
+ * @campo esquerda  Caminho à esquerda.
+ * @campo direita   Caminho à direita.
  */
 typedef struct Sala {
     char         nome[MAX_NOME];
+    char         pista[MAX_PISTA]; /* "" significa sem pista */
     struct Sala *esquerda;
     struct Sala *direita;
 } Sala;
 
+/* ================================================================
+ *  MÓDULO 2 — Árvore Binária de Busca (BST) de Pistas
+ * ================================================================ */
+
+/**
+ * NoPista — nó da BST que armazena as pistas coletadas.
+ *
+ * @campo pista     String com a pista.
+ * @campo esquerda  Sub-árvore com pistas lexicograficamente menores.
+ * @campo direita   Sub-árvore com pistas lexicograficamente maiores.
+ */
+typedef struct NoPista {
+    char           pista[MAX_PISTA];
+    struct NoPista *esquerda;
+    struct NoPista *direita;
+} NoPista;
+
 /* ─── Protótipos ──────────────────────────────────────────── */
-Sala *criarSala(const char *nome);
-void  explorarSalas(Sala *atual);
-void  liberarArvore(Sala *raiz);
+
+/* Mapa */
+Sala   *criarSala(const char *nome, const char *pista);
+void    explorarSalas(Sala *atual, NoPista **bst);
+void    liberarArvore(Sala *raiz);
+
+/* BST de pistas */
+NoPista *inserirPista(NoPista *raiz, const char *pista);
+void     emOrdem(NoPista *raiz);
+void     liberarBST(NoPista *raiz);
 
 /* ================================================================
  *  criarSala
  *  ---------
- *  Aloca dinamicamente um novo nó (sala) e inicializa seus campos.
+ *  Aloca um novo nó do mapa com nome e pista associada.
  *
- *  @param nome  String com o nome do cômodo.
- *  @return      Ponteiro para a sala criada, ou NULL em falha.
+ *  @param nome   Nome do cômodo.
+ *  @param pista  Pista da sala ("" para nenhuma).
+ *  @return       Ponteiro para a Sala criada.
  * ================================================================ */
-Sala *criarSala(const char *nome) {
+Sala *criarSala(const char *nome, const char *pista) {
     Sala *nova = (Sala *)malloc(sizeof(Sala));
     if (!nova) {
         fprintf(stderr, "[ERRO] Falha ao alocar memória para sala '%s'.\n", nome);
-        return NULL;
+        exit(EXIT_FAILURE);
     }
-    strncpy(nova->nome, nome, MAX_NOME - 1);
-    nova->nome[MAX_NOME - 1] = '\0'; /* garante terminador nulo */
+    strncpy(nova->nome,  nome,  MAX_NOME  - 1);
+    strncpy(nova->pista, pista, MAX_PISTA - 1);
+    nova->nome[MAX_NOME   - 1] = '\0';
+    nova->pista[MAX_PISTA - 1] = '\0';
     nova->esquerda = NULL;
     nova->direita  = NULL;
     return nova;
 }
 
 /* ================================================================
+ *  inserirPista
+ *  ------------
+ *  Insere uma string na BST de pistas mantendo a ordem alfabética.
+ *  Pistas duplicadas são ignoradas.
+ *
+ *  @param raiz   Raiz atual da BST.
+ *  @param pista  String a inserir.
+ *  @return       Nova raiz da BST (pode mudar apenas na 1ª inserção).
+ * ================================================================ */
+NoPista *inserirPista(NoPista *raiz, const char *pista) {
+    if (!raiz) {
+        /* Cria novo nó */
+        NoPista *novo = (NoPista *)malloc(sizeof(NoPista));
+        if (!novo) {
+            fprintf(stderr, "[ERRO] Falha ao alocar memória para pista.\n");
+            exit(EXIT_FAILURE);
+        }
+        strncpy(novo->pista, pista, MAX_PISTA - 1);
+        novo->pista[MAX_PISTA - 1] = '\0';
+        novo->esquerda = NULL;
+        novo->direita  = NULL;
+        return novo;
+    }
+
+    int cmp = strcmp(pista, raiz->pista);
+
+    if (cmp < 0)
+        raiz->esquerda = inserirPista(raiz->esquerda, pista);
+    else if (cmp > 0)
+        raiz->direita  = inserirPista(raiz->direita,  pista);
+    /* cmp == 0: pista duplicada, ignora */
+
+    return raiz;
+}
+
+/* ================================================================
+ *  emOrdem
+ *  -------
+ *  Percorre a BST em ordem simétrica (in-order) e imprime
+ *  todas as pistas em ordem alfabética.
+ *
+ *  @param raiz  Raiz (ou sub-raiz) da BST.
+ * ================================================================ */
+void emOrdem(NoPista *raiz) {
+    if (!raiz) return;
+    emOrdem(raiz->esquerda);
+    printf("    📄 %s\n", raiz->pista);
+    emOrdem(raiz->direita);
+}
+
+/* ================================================================
  *  explorarSalas
  *  -------------
- *  Permite ao jogador navegar pela árvore binária interativamente.
- *  A cada sala, o jogador escolhe:
- *    e → ir para o cômodo à esquerda
- *    d → ir para o cômodo à direita
- *    s → encerrar a exploração
- *  A função termina ao atingir um nó-folha (sem filhos).
+ *  Navega pela árvore do mapa; ao entrar numa sala com pista,
+ *  insere a pista na BST automaticamente.
  *
- *  @param atual  Ponteiro para a sala corrente.
+ *  @param atual  Sala corrente do mapa.
+ *  @param bst    Ponteiro para a raiz da BST de pistas.
  * ================================================================ */
-void explorarSalas(Sala *atual) {
+void explorarSalas(Sala *atual, NoPista **bst) {
     if (!atual) return;
 
-    printf("\n╔══════════════════════════════════════╗\n");
-    printf("  🕵️Você está em: %-18s║\n", atual->nome);
-    printf("╚══════════════════════════════════════╝\n");
+    printf("\n╔══════════════════════════════════════════╗\n");
+    printf("║  🕵️  Você está em: %-21s║\n", atual->nome);
+    printf("╚══════════════════════════════════════════╝\n");
 
-    /* Nó-folha: sem caminhos disponíveis */
+    /* Verifica e registra pista da sala */
+    if (strlen(atual->pista) > 0) {
+        printf("  🔎 Pista encontrada: \"%s\"\n", atual->pista);
+        *bst = inserirPista(*bst, atual->pista);
+        printf("  ✅ Pista adicionada ao seu caderno!\n");
+    }
+
+    /* Nó-folha */
     if (!atual->esquerda && !atual->direita) {
         printf("  ➤ Beco sem saída! Não há mais caminhos a explorar.\n");
-        printf("  ➤ Sua exploração terminou aqui.\n");
         return;
     }
 
-    /* Exibe as opções disponíveis conforme os filhos existentes */
+    /* Opções de navegação */
     printf("  Caminhos disponíveis:\n");
     if (atual->esquerda)
         printf("    [e] Ir para a ESQUERDA → %s\n", atual->esquerda->nome);
@@ -98,42 +185,37 @@ void explorarSalas(Sala *atual) {
     printf("  Sua escolha: ");
 
     char opcao;
-    scanf(" %c", &opcao);   /* espaço antes de %c descarta '\n' residual */
+    scanf(" %c", &opcao);
 
     switch (opcao) {
-        case 'e':
-        case 'E':
+        case 'e': case 'E':
             if (atual->esquerda)
-                explorarSalas(atual->esquerda);
+                explorarSalas(atual->esquerda, bst);
             else
-                printf("  ⚠️  Não há caminho à esquerda aqui!\n");
+                printf("  ⚠️  Não há caminho à esquerda!\n");
             break;
 
-        case 'd':
-        case 'D':
+        case 'd': case 'D':
             if (atual->direita)
-                explorarSalas(atual->direita);
+                explorarSalas(atual->direita, bst);
             else
-                printf("  ⚠️  Não há caminho à direita aqui!\n");
+                printf("  ⚠️  Não há caminho à direita!\n");
             break;
 
-        case 's':
-        case 'S':
-            printf("\n  🚪 Você decidiu encerrar a exploração. Até a próxima!\n");
+        case 's': case 'S':
+            printf("\n  🚪 Você encerrou a exploração.\n");
             break;
 
         default:
-            printf("  ❌ Opção inválida. Tente novamente.\n");
-            explorarSalas(atual); /* repete a sala atual */
+            printf("  ❌ Opção inválida.\n");
+            explorarSalas(atual, bst);
     }
 }
 
 /* ================================================================
- *  liberarArvore
- *  -------------
- *  Percorre a árvore em pós-ordem e libera toda memória alocada.
- *
- *  @param raiz  Raiz (ou sub-raiz) da árvore a ser liberada.
+ *  liberarArvore / liberarBST
+ *  --------------------------
+ *  Liberam, respectivamente, o mapa e a BST de pistas (pós-ordem).
  * ================================================================ */
 void liberarArvore(Sala *raiz) {
     if (!raiz) return;
@@ -142,56 +224,71 @@ void liberarArvore(Sala *raiz) {
     free(raiz);
 }
 
+void liberarBST(NoPista *raiz) {
+    if (!raiz) return;
+    liberarBST(raiz->esquerda);
+    liberarBST(raiz->direita);
+    free(raiz);
+}
+
 /* ================================================================
  *  main
  *  ----
- *  Monta o mapa da mansão como uma árvore binária estática
- *  e inicia a exploração a partir do Hall de Entrada.
+ *  Monta o mapa com pistas em certas salas e inicia o jogo.
  *
- *  Layout da mansão:
- *
+ *  Layout:
  *                   Hall de Entrada
  *                  /               \
- *           Sala de Estar        Biblioteca
+ *           Sala de Estar        Biblioteca  [luva ensanguentada]
  *           /         \          /        \
- *        Cozinha    Jardim   Escritório  Porão
+ *       Cozinha      Jardim  Escritório  Porão [carta anônima]
+ *      [faca]      [pegadas]  [veneno]
  *        /    \
- *    Despensa  Varanda
+ *   Despensa  Varanda
+ *  [ricino]
  * ================================================================ */
 int main(void) {
-    printf("╔═══════════════════════════════════════════╗\n");
-    printf("║       🔍 DETECTIVE QUEST — Nível Novato   ║\n");
-    printf("║         Exploração da Mansão Misteriosa   ║\n");
-    printf("╚═══════════════════════════════════════════╝\n");
-    printf("\n  Construindo o mapa da mansão...\n");
+    printf("╔═══════════════════════════════════════════════╗\n");
+    printf("║   🔍 DETECTIVE QUEST — Nível Aventureiro      ║\n");
+    printf("║      Mansão + Caderno de Pistas (BST)         ║\n");
+    printf("╚═══════════════════════════════════════════════╝\n");
 
-    /* ── Nível 0 (raiz) ── */
-    Sala *raiz = criarSala("Hall de Entrada");
+    /* ── Mapa da mansão (2º parâmetro = pista da sala) ── */
+    Sala *raiz = criarSala("Hall de Entrada", "");
 
-    /* ── Nível 1 ── */
-    raiz->esquerda = criarSala("Sala de Estar");
-    raiz->direita  = criarSala("Biblioteca");
+    raiz->esquerda = criarSala("Sala de Estar", "");
+    raiz->direita  = criarSala("Biblioteca",    "Luva ensanguentada");
 
-    /* ── Nível 2 — ramo esquerdo ── */
-    raiz->esquerda->esquerda = criarSala("Cozinha");
-    raiz->esquerda->direita  = criarSala("Jardim");
+    raiz->esquerda->esquerda = criarSala("Cozinha", "Faca com impressão digital");
+    raiz->esquerda->direita  = criarSala("Jardim",  "Pegadas na lama");
 
-    /* ── Nível 2 — ramo direito ── */
-    raiz->direita->esquerda = criarSala("Escritório");
-    raiz->direita->direita  = criarSala("Porão");
+    raiz->direita->esquerda = criarSala("Escritório", "Frasco de veneno");
+    raiz->direita->direita  = criarSala("Porão",      "Carta anônima");
 
-    /* ── Nível 3 — folhas do ramo Cozinha ── */
-    raiz->esquerda->esquerda->esquerda = criarSala("Despensa");
-    raiz->esquerda->esquerda->direita  = criarSala("Varanda");
+    raiz->esquerda->esquerda->esquerda = criarSala("Despensa", "Extrato de ricino");
+    raiz->esquerda->esquerda->direita  = criarSala("Varanda",  "");
 
-    printf("  Mapa carregado! Boa investigação, detetive.\n");
+    /* ── BST de pistas (inicialmente vazia) ── */
+    NoPista *bst = NULL;
 
-    /* Inicia a exploração a partir da raiz */
-    explorarSalas(raiz);
+    /* ── Exploração ── */
+    explorarSalas(raiz, &bst);
 
-    /* Libera toda a memória alocada */
+    /* ── Relatório de pistas coletadas ── */
+    printf("\n╔══════════════════════════════════════════════╗\n");
+    printf("║        📓 CADERNO DE PISTAS COLETADAS        ║\n");
+    printf("╚══════════════════════════════════════════════╝\n");
+    if (!bst) {
+        printf("  Nenhuma pista encontrada nesta exploração.\n");
+    } else {
+        printf("  Pistas em ordem alfabética:\n");
+        emOrdem(bst);
+    }
+
+    /* ── Limpeza de memória ── */
     liberarArvore(raiz);
+    liberarBST(bst);
 
-    printf("\n  🏁 Programa encerrado. Até a próxima aventura!\n\n");
+    printf("\n  🏁 Investigação encerrada. Bom trabalho, detetive!\n\n");
     return 0;
 }

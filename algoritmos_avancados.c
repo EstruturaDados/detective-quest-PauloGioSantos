@@ -1,10 +1,10 @@
-/*
+/*Detetive - Mestre
  * ============================================================
  *  Detective Quest — Nível Mestre
  *  Mapa + BST de Pistas + Tabela Hash (Pista → Suspeito)
  * ============================================================
  *  Autor  : Paulo Giovani dos Santos - Enigma Studios
- *  Versão : 4.0  (estende os Níveis Novato, Aventureiro e Mestre 3.0)
+ *  Versão : 3.0  (estende os Níveis Novato, Aventureiro e Mestre)
  *
  *  Novidades em relação à Versão 3.0:
  *    • Função encontrarSuspeito() — consulta pista → suspeito na Hash.

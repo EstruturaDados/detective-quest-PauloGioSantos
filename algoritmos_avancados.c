@@ -1,47 +1,197 @@
+/*
+ * ============================================================
+ *  Detective Quest — Nível Novato
+ *  Mapa da Mansão com Árvore Binária
+ * ============================================================
+ *  Autor  : Paulo Giovani dos Santos - Enigma Studios
+ *  Versão : 1.0
+ *
+ *  Descrição:
+ *    Representa o mapa de uma mansão como uma árvore binária.
+ *    Cada nó é uma sala (cômodo). O jogador explora a mansão
+ *    escolhendo ir à esquerda (e) ou à direita (d) a partir
+ *    do Hall de Entrada, até atingir um nó-folha.
+ * ============================================================
+ */
+
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-// Desafio Detective Quest
-// Tema 4 - Árvores e Tabela Hash
-// Este código inicial serve como base para o desenvolvimento das estruturas de navegação, pistas e suspeitos.
-// Use as instruções de cada região para desenvolver o sistema completo com árvore binária, árvore de busca e tabela hash.
+/* ─── Constantes ─────────────────────────────────────────── */
+#define MAX_NOME 64
 
-int main() {
+/* ─── Estrutura de dados ──────────────────────────────────── */
 
-    // 🌱 Nível Novato: Mapa da Mansão com Árvore Binária
-    //
-    // - Crie uma struct Sala com nome, e dois ponteiros: esquerda e direita.
-    // - Use funções como criarSala(), conectarSalas() e explorarSalas().
-    // - A árvore pode ser fixa: Hall de Entrada, Biblioteca, Cozinha, Sótão etc.
-    // - O jogador deve poder explorar indo à esquerda (e) ou à direita (d).
-    // - Finalize a exploração com uma opção de saída (s).
-    // - Exiba o nome da sala a cada movimento.
-    // - Use recursão ou laços para caminhar pela árvore.
-    // - Nenhuma inserção dinâmica é necessária neste nível.
+/**
+ * Sala — nó da árvore binária.
+ *
+ * @campo nome      Nome descritivo do cômodo.
+ * @campo esquerda  Ponteiro para o cômodo à esquerda.
+ * @campo direita   Ponteiro para o cômodo à direita.
+ */
+typedef struct Sala {
+    char         nome[MAX_NOME];
+    struct Sala *esquerda;
+    struct Sala *direita;
+} Sala;
 
-    // 🔍 Nível Aventureiro: Armazenamento de Pistas com Árvore de Busca
-    //
-    // - Crie uma struct Pista com campo texto (string).
-    // - Crie uma árvore binária de busca (BST) para inserir as pistas coletadas.
-    // - Ao visitar salas específicas, adicione pistas automaticamente com inserirBST().
-    // - Implemente uma função para exibir as pistas em ordem alfabética (emOrdem()).
-    // - Utilize alocação dinâmica e comparação de strings (strcmp) para organizar.
-    // - Não precisa remover ou balancear a árvore.
-    // - Use funções para modularizar: inserirPista(), listarPistas().
-    // - A árvore de pistas deve ser exibida quando o jogador quiser revisar evidências.
+/* ─── Protótipos ──────────────────────────────────────────── */
+Sala *criarSala(const char *nome);
+void  explorarSalas(Sala *atual);
+void  liberarArvore(Sala *raiz);
 
-    // 🧠 Nível Mestre: Relacionamento de Pistas com Suspeitos via Hash
-    //
-    // - Crie uma struct Suspeito contendo nome e lista de pistas associadas.
-    // - Crie uma tabela hash (ex: array de ponteiros para listas encadeadas).
-    // - A chave pode ser o nome do suspeito ou derivada das pistas.
-    // - Implemente uma função inserirHash(pista, suspeito) para registrar relações.
-    // - Crie uma função para mostrar todos os suspeitos e suas respectivas pistas.
-    // - Adicione um contador para saber qual suspeito foi mais citado.
-    // - Exiba ao final o “suspeito mais provável” baseado nas pistas coletadas.
-    // - Para hashing simples, pode usar soma dos valores ASCII do nome ou primeira letra.
-    // - Em caso de colisão, use lista encadeada para tratar.
-    // - Modularize com funções como inicializarHash(), buscarSuspeito(), listarAssociacoes().
-
-    return 0;
+/* ================================================================
+ *  criarSala
+ *  ---------
+ *  Aloca dinamicamente um novo nó (sala) e inicializa seus campos.
+ *
+ *  @param nome  String com o nome do cômodo.
+ *  @return      Ponteiro para a sala criada, ou NULL em falha.
+ * ================================================================ */
+Sala *criarSala(const char *nome) {
+    Sala *nova = (Sala *)malloc(sizeof(Sala));
+    if (!nova) {
+        fprintf(stderr, "[ERRO] Falha ao alocar memória para sala '%s'.\n", nome);
+        return NULL;
+    }
+    strncpy(nova->nome, nome, MAX_NOME - 1);
+    nova->nome[MAX_NOME - 1] = '\0'; /* garante terminador nulo */
+    nova->esquerda = NULL;
+    nova->direita  = NULL;
+    return nova;
 }
 
+/* ================================================================
+ *  explorarSalas
+ *  -------------
+ *  Permite ao jogador navegar pela árvore binária interativamente.
+ *  A cada sala, o jogador escolhe:
+ *    e → ir para o cômodo à esquerda
+ *    d → ir para o cômodo à direita
+ *    s → encerrar a exploração
+ *  A função termina ao atingir um nó-folha (sem filhos).
+ *
+ *  @param atual  Ponteiro para a sala corrente.
+ * ================================================================ */
+void explorarSalas(Sala *atual) {
+    if (!atual) return;
+
+    printf("\n╔══════════════════════════════════════╗\n");
+    printf("  🕵️Você está em: %-18s║\n", atual->nome);
+    printf("╚══════════════════════════════════════╝\n");
+
+    /* Nó-folha: sem caminhos disponíveis */
+    if (!atual->esquerda && !atual->direita) {
+        printf("  ➤ Beco sem saída! Não há mais caminhos a explorar.\n");
+        printf("  ➤ Sua exploração terminou aqui.\n");
+        return;
+    }
+
+    /* Exibe as opções disponíveis conforme os filhos existentes */
+    printf("  Caminhos disponíveis:\n");
+    if (atual->esquerda)
+        printf("    [e] Ir para a ESQUERDA → %s\n", atual->esquerda->nome);
+    if (atual->direita)
+        printf("    [d] Ir para a DIREITA  → %s\n", atual->direita->nome);
+    printf("    [s] Sair da exploração\n");
+    printf("  Sua escolha: ");
+
+    char opcao;
+    scanf(" %c", &opcao);   /* espaço antes de %c descarta '\n' residual */
+
+    switch (opcao) {
+        case 'e':
+        case 'E':
+            if (atual->esquerda)
+                explorarSalas(atual->esquerda);
+            else
+                printf("  ⚠️  Não há caminho à esquerda aqui!\n");
+            break;
+
+        case 'd':
+        case 'D':
+            if (atual->direita)
+                explorarSalas(atual->direita);
+            else
+                printf("  ⚠️  Não há caminho à direita aqui!\n");
+            break;
+
+        case 's':
+        case 'S':
+            printf("\n  🚪 Você decidiu encerrar a exploração. Até a próxima!\n");
+            break;
+
+        default:
+            printf("  ❌ Opção inválida. Tente novamente.\n");
+            explorarSalas(atual); /* repete a sala atual */
+    }
+}
+
+/* ================================================================
+ *  liberarArvore
+ *  -------------
+ *  Percorre a árvore em pós-ordem e libera toda memória alocada.
+ *
+ *  @param raiz  Raiz (ou sub-raiz) da árvore a ser liberada.
+ * ================================================================ */
+void liberarArvore(Sala *raiz) {
+    if (!raiz) return;
+    liberarArvore(raiz->esquerda);
+    liberarArvore(raiz->direita);
+    free(raiz);
+}
+
+/* ================================================================
+ *  main
+ *  ----
+ *  Monta o mapa da mansão como uma árvore binária estática
+ *  e inicia a exploração a partir do Hall de Entrada.
+ *
+ *  Layout da mansão:
+ *
+ *                   Hall de Entrada
+ *                  /               \
+ *           Sala de Estar        Biblioteca
+ *           /         \          /        \
+ *        Cozinha    Jardim   Escritório  Porão
+ *        /    \
+ *    Despensa  Varanda
+ * ================================================================ */
+int main(void) {
+    printf("╔═══════════════════════════════════════════╗\n");
+    printf("║       🔍 DETECTIVE QUEST — Nível Novato   ║\n");
+    printf("║         Exploração da Mansão Misteriosa   ║\n");
+    printf("╚═══════════════════════════════════════════╝\n");
+    printf("\n  Construindo o mapa da mansão...\n");
+
+    /* ── Nível 0 (raiz) ── */
+    Sala *raiz = criarSala("Hall de Entrada");
+
+    /* ── Nível 1 ── */
+    raiz->esquerda = criarSala("Sala de Estar");
+    raiz->direita  = criarSala("Biblioteca");
+
+    /* ── Nível 2 — ramo esquerdo ── */
+    raiz->esquerda->esquerda = criarSala("Cozinha");
+    raiz->esquerda->direita  = criarSala("Jardim");
+
+    /* ── Nível 2 — ramo direito ── */
+    raiz->direita->esquerda = criarSala("Escritório");
+    raiz->direita->direita  = criarSala("Porão");
+
+    /* ── Nível 3 — folhas do ramo Cozinha ── */
+    raiz->esquerda->esquerda->esquerda = criarSala("Despensa");
+    raiz->esquerda->esquerda->direita  = criarSala("Varanda");
+
+    printf("  Mapa carregado! Boa investigação, detetive.\n");
+
+    /* Inicia a exploração a partir da raiz */
+    explorarSalas(raiz);
+
+    /* Libera toda a memória alocada */
+    liberarArvore(raiz);
+
+    printf("\n  🏁 Programa encerrado. Até a próxima aventura!\n\n");
+    return 0;
+}
